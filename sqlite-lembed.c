@@ -271,6 +271,95 @@ int api_model_from_name(struct Api *api, const char *name, int name_length,
   }
   return SQLITE_ERROR;
 }
+
+int count_tokens (struct llama_model *model, 
+                  struct llama_context *context,
+                  const char *input, 
+                  size_t start_pos,
+                  size_t end_pos) 
+{
+
+  if (end_pos-start_pos >10230) return -1;
+  char buffer [10240];
+  int i=0;
+  for (i=0;i<=end_pos-start_pos;i++)
+    buffer[i]=input[i+start_pos];
+  buffer[i]=0;
+ // printf("-%s-\n",buffer);
+
+  int input_token_count_estimate =
+      llama_tokenize(model, buffer, strlen(buffer), NULL, 0, true, true);
+
+  if (input_token_count_estimate >= 0) {
+    return -1;
+  }
+  return -input_token_count_estimate;
+}
+
+static void lembed_split (sqlite3_context *context, int argc, sqlite3_value **argv) {
+  struct llama_model *model;
+  struct llama_context *ctx;
+  int rc;
+  const char * input;
+  sqlite3_int64 input_len;
+ 
+  assert(argc==3);
+    input = (const char *)sqlite3_value_text(argv[1]);
+    input_len = sqlite3_value_bytes(argv[1]);
+    rc = api_model_from_name((struct Api *)sqlite3_user_data(context),
+                               (const char *)sqlite3_value_text(argv[0]),
+                               sqlite3_value_bytes(argv[0]), &model, &ctx);
+
+    if(rc != SQLITE_OK) {
+      char * zSql = sqlite3_mprintf("Unknown model name '%s'. Was it registered with lembed_models?", sqlite3_value_text(argv[0]));
+      sqlite3_result_error(context, zSql, -1);
+      sqlite3_free(zSql);
+      return;
+    }
+
+  int32_t max_tokens = sqlite3_value_int(argv[2]);
+
+ if(max_tokens>512 || max_tokens<3) {
+    sqlite3_result_error(context, "Incorrect number of tokens", -1);
+    return;
+  } 
+  // Start messing here 
+ 
+  //split input sequence through spaces
+  int start_point=0;
+  int space_pointer=0;
+  int i;
+  int last_space_pointer=0;
+
+
+  int min_chunk_length=max_tokens/16+1;
+
+  sqlite3_str *s = sqlite3_str_new(NULL);
+
+  for (i=start_point;i<input_len ; i++)
+  {
+     //skip till next space
+     if (input[i]!=' ' ) continue;
+     if (i-start_point<min_chunk_length) continue;
+     int tokens=count_tokens(model, ctx,input,start_point,i-1);
+
+     if (tokens >= max_tokens)
+     {
+          sqlite3_str_appendf(s, "(%d,%d,%d),", start_point, i-1,tokens);
+          start_point=i+1;
+        
+     }
+  }
+
+  sqlite3_str_appendf(s, "(%d,%d,%d)", start_point, i-1,count_tokens(model, ctx,input,start_point,i-1));
+
+  char *result = sqlite3_str_finish(s);
+  assert(result);
+  sqlite3_result_text(context, result, -1, sqlite3_free);
+}
+
+
+
 static void lembed(sqlite3_context *context, int argc, sqlite3_value **argv) {
   struct llama_model *model;
   struct llama_context *ctx;
@@ -310,6 +399,9 @@ static void lembed(sqlite3_context *context, int argc, sqlite3_value **argv) {
   sqlite3_result_blob(context, embedding, sizeof(float) * dimensions, sqlite3_free);
   sqlite3_result_subtype(context, 223); // TODO define
 }
+
+
+
 
 static void lembed_tokenize_json(sqlite3_context *context, int argc,
                                  sqlite3_value **argv) {
@@ -895,6 +987,7 @@ __declspec(dllexport)
       // clang-format off
     {"lembed",                 lembed,                    1},
     {"lembed",                 lembed,                    2},
+    {"lembed_split",           lembed_split,              3},
     {"lembed_tokenize_json",   lembed_tokenize_json,      2},
     {"lembed_token_score",     lembed_token_score,        2},
     {"lembed_token_to_piece",  lembed_token_to_piece_,    2},
