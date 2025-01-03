@@ -58,7 +58,7 @@ int embed_single(struct llama_model *model, struct llama_context *context,
                  float **out_embedding,
                  /** Output embedding length (n dimensions) */
                  int *out_dimensions) {
-  int n_batch = 512;
+  int n_batch = 5120;
   int n_ctx_train = llama_n_ctx_train(model);
   int n_ctx = llama_n_ctx(context);
 
