@@ -41,6 +41,7 @@ else
 PYTHON=python3
 endif
 
+release=1
 ifdef release
 LLAMA_CMAKE_FLAGS+=-DCMAKE_BUILD_TYPE=Release
 else

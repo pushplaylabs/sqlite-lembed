@@ -1,6 +1,6 @@
 models/
 vendor/sqlite
-
+vendor/
 *.gguf
 *.dylib
 ggml-metal.metal
