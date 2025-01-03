@@ -335,13 +335,13 @@ static void lembed_split (sqlite3_context *context, int argc, sqlite3_value **ar
   int min_chunk_length=max_tokens/16+1;
 
   sqlite3_str *s = sqlite3_str_new(NULL);
-
+  int tokens;
   for (i=start_point;i<input_len ; i++)
   {
      //skip till next space
      if (input[i]!=' ' ) continue;
      if (i-start_point<min_chunk_length) continue;
-     int tokens=count_tokens(model, ctx,input,start_point,i-1);
+     tokens=count_tokens(model, ctx,input,start_point,i-1);
 
      if (tokens >= max_tokens || i-start_point)
      {
@@ -352,7 +352,7 @@ static void lembed_split (sqlite3_context *context, int argc, sqlite3_value **ar
   }
 
   tokens=count_tokens(model, ctx,input,start_point,i-1);
-  if (tokens<5000) sqlite3_str_appendf(s, "(%d,%d,%d)", start_point, i-1,);
+  if (tokens<5000) sqlite3_str_appendf(s, "(%d,%d,%d)", start_point, i-1,tokens);
 
   char *result = sqlite3_str_finish(s);
   assert(result);
